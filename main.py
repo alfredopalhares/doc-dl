@@ -4,31 +4,38 @@ import json
 import os
 import requests
 import shutil
+import re
+import click
+
 from PIL import Image
 from fpdf import FPDF
 from pathlib import Path
 from tqdm import tqdm
-import re
 
-download_dir = 'download'
-image_dir = os.path.join(download_dir, "jpg/")
-bin_dir = os.path.join(download_dir, "bin/")
+# Globals
+verbosity = 0
 
-def prepare_download(download_path:str):
-    if os.path.isdir(download_path):
-        print("Cleaning old download directory")
+def prepare_paths(download_path: str, image_path: str, bin_path: str, cleanup=False)->bool:
+    if cleanup or (os.path.isdir(download_path) and not cleanup):
+        log("Cleaning download directory", 1)
         shutil.rmtree(download_path)
-    os.mkdir(download_path)
-    os.mkdir(image_dir)
-    os.mkdir(bin_dir)
+        return True
+    else:
+        log(f'Storing downloads on: {download_path}', 1)
+        os.mkdir(download_path)
+        log(f'Storing Images on: {image_path}', 2)
+        os.mkdir(image_path)
+        log(f'Storing Binaries on: {bin_path}', 2)
+        os.mkdir(bin_path)
+        return False
 
 # TODO: Check if the file is already there
-def downloadFile(uri, path):
+def downloadFile(uri: str, path: str, headers: dict):
     filename=os.path.join(os.getcwd(), path, uri.split('/')[-1])
     url = "https://" + uri
     jpg = open(filename, 'wb')
     down_headers = headers
-    down_headers['Host'] = 'image.isu.pub'
+    down_headers['Host'] = uri.split('/')[0]
     response = requests.request("GET",url, headers=headers)
     jpg.write(response.content)
     jpg.close()
@@ -45,56 +52,80 @@ def extract_number_from_page(page_uri: str) -> int:
         return int(page_no.group())
     return 0
 
-url = "https://reader3.isu.pub/ducatiomaha/ducatiomaha_2015_diavel/reader3_4.json"
+def set_log_level(verbose):
+    global verbosity
+    verbosity = verbose
+    if verbosity > 0:
+        click.echo(message=f'Verbosity leverl set to: {verbosity}', color=True)
 
-payload = ""
-headers = {
-    'Host': "reader3.isu.pub",
-    'User-Agent':  "Mozilla/5.0 (X11; Linux x86_64; rv:74.0) Gecko/20100101 Firefox/74.0",
-    'Accept': "*/*",
-    'Accept-Language': "en-US,en;q=0.5",
-    'Referer': "https://issuu.com/ducatiomaha/docs/ducatiomaha_2015_diavel?e=1222863/13414409",
-    'Cache-Control': "max-age=0",
-    'DNT': "1",
-    'Origin': "https://issuu.com",
-    'TE': 'Trailers'
-    }
+def log(message:str, level=0):
+    if level <= verbosity:
+        click.echo(message)
 
-response = requests.request("GET", url, data=payload, headers=headers)
-data = response.json()
+@click.command()
+@click.argument('url')
+@click.option('-f', '--file', default='output.pdf', help='Name of the output pdf')
+@click.option('-d', '--download', default='download', help='Download Directory')
+@click.option('-k', '--keep', default=False, is_flag=True, help='Keep downladed files after generating the file')
+@click.option('-v', '--verbose', count=True)
 
-print("Got a document with", len(data['document']['pages']), "pages")
+def main(download, file, keep, url, verbose):
 
-prepare_download(download_dir)
-print("Downloading Files")
-# TODO: Bin files are not downloading right
-# maybe the is the Host Header that is not matching the link
-images = []
-for page in tqdm(data['document']['pages']):
-    imgPath = os.path.join(download_dir, 'jpg', page['imageUri'].split('/')[-1])
-    page_no = extract_number_from_page(page['imageUri'])
-    downloadFile(page['imageUri'], download_dir + "/jpg/")
-    images.append({
-        "name": imgPath,
-        "page_no" : page_no,
-        "height": page["height"],
-        "width": page["width"],
-        "verfied": False
-        })
-    downloadFile(page['layersInfo']['uri'], download_dir + "/bin/")
+    set_log_level(verbose)
+    #url = "https://reader3.isu.pub/ducatiomaha/ducatiomaha_2015_diavel/reader3_4.json"
+    image_path = os.path.join(download, "jpg/")
+    bin_path = os.path.join(download, "bin/")
 
-# Converting images to PDFs
-# https://pyfpdf.github.io/fpdf2/Tutorial.html 
-print("Converting images into PDF")
-pdf = FPDF()
-for img in tqdm(images):
-    if not os.path.exists(img['name']):
-        print("Something wronh could not find the image")
-        exit(1)
-    elif img['page_no'] == 1:
-        print('Using the first page as cover')
-        pdf = FPDF(unit= "pt", format= [img['width'], img['height']] )
-    pdf.add_page()
-    pdf.image(img['name'], 0, 0, img['width'], img['height']) 
+    payload = ""
+    headers = {
+        'Host': "reader3.isu.pub",
+        'User-Agent':  "Mozilla/5.0 (X11; Linux x86_64; rv:74.0) Gecko/20100101 Firefox/74.0",
+        'Accept': "*/*",
+        'Accept-Language': "en-US,en;q=0.5",
+        'Referer': "https://issuu.com/ducatiomaha/docs/ducatiomaha_2015_diavel?e=1222863/13414409",
+        'Cache-Control': "max-age=0",
+        'DNT': "1",
+        'Origin': "https://issuu.com",
+        'TE': 'Trailers'
+        }
 
-pdf.output("output.pdf")
+    response = requests.request("GET", url, data=payload, headers=headers)
+    data = response.json()
+    pages = len(data['document']['pages'])
+    log(f'Got a document with {pages} pages', 1)
+
+    prepare_paths(download, image_path, bin_path)
+    log("Downloading Files....")
+    images = []
+    for page in tqdm(data['document']['pages']):
+        imgPath = os.path.join(image_path, page['imageUri'].split('/')[-1])
+        page_no = extract_number_from_page(page['imageUri'])
+        downloadFile(uri=page['imageUri'], path=image_path, headers=headers)
+        images.append({
+            "name": imgPath,
+            "page_no" : page_no,
+            "height": page["height"],
+            "width": page["width"],
+            "verfied": False
+            })
+        downloadFile(uri=page['layersInfo']['uri'], path=bin_path, headers=headers)
+
+    # Converting images to PDFs
+    # https://pyfpdf.github.io/fpdf2/Tutorial.html 
+    print("Converting images into PDF")
+    pdf = FPDF()
+    for img in tqdm(images):
+        if not os.path.exists(img['name']):
+            print("Something wronh could not find the image")
+            exit(1)
+        elif img['page_no'] == 1:
+            print('Using the first page as cover')
+            pdf = FPDF(unit= "pt", format= [img['width'], img['height']] )
+        pdf.add_page()
+        pdf.image(img['name'], 0, 0, img['width'], img['height']) 
+
+    pdf.output("output.pdf")
+
+    prepare_paths(download_path=download, image_path=image_path, bin_path=bin_path, cleanup=keep)
+if __name__ == '__main__':
+    main()
