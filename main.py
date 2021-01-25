@@ -23,7 +23,6 @@ def prepare_download(download_path:str):
     os.mkdir(bin_dir)
 
 # TODO: Check if the file is already there
-
 def downloadFile(uri, path):
     filename=os.path.join(os.getcwd(), path, uri.split('/')[-1])
     url = "https://" + uri
@@ -33,7 +32,6 @@ def downloadFile(uri, path):
     response = requests.request("GET",url, headers=headers)
     jpg.write(response.content)
     jpg.close()
-
 
 def extract_number_from_page(page_uri: str) -> int:
     """ Tryies to extrat the number from the pages """
@@ -63,8 +61,6 @@ headers = {
     }
 
 response = requests.request("GET", url, data=payload, headers=headers)
-
-
 data = response.json()
 
 print("Got a document with", len(data['document']['pages']), "pages")
@@ -87,13 +83,11 @@ for page in tqdm(data['document']['pages']):
         })
     downloadFile(page['layersInfo']['uri'], download_dir + "/bin/")
 
-print(images)
 # Converting images to PDFs
 # https://pyfpdf.github.io/fpdf2/Tutorial.html 
 print("Converting images into PDF")
 pdf = FPDF()
 for img in tqdm(images):
-    print(img)
     if not os.path.exists(img['name']):
         print("Something wronh could not find the image")
         exit(1)
