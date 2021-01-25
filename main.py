@@ -62,6 +62,9 @@ def log(message:str, level=0):
     if level <= verbosity:
         click.echo(message)
 
+def get_json(url: str, headers) -> dict:
+    pass
+
 @click.command()
 @click.argument('url')
 @click.option('-f', '--file', default='output.pdf', help='Name of the output pdf')
@@ -72,13 +75,17 @@ def log(message:str, level=0):
 def main(download, file, keep, url, verbose):
 
     set_log_level(verbose)
+
+    if os.path.exists(file):
+        log(f'PDF file {file} already exists, remove or specify another name with --file')
+        exit(1)
+
     #url = "https://reader3.isu.pub/ducatiomaha/ducatiomaha_2015_diavel/reader3_4.json"
     image_path = os.path.join(download, "jpg/")
     bin_path = os.path.join(download, "bin/")
-
     payload = ""
+    # 'Host': "reader3.isu.pub",
     headers = {
-        'Host': "reader3.isu.pub",
         'User-Agent':  "Mozilla/5.0 (X11; Linux x86_64; rv:74.0) Gecko/20100101 Firefox/74.0",
         'Accept': "*/*",
         'Accept-Language': "en-US,en;q=0.5",
@@ -123,8 +130,8 @@ def main(download, file, keep, url, verbose):
             pdf = FPDF(unit= "pt", format= [img['width'], img['height']] )
         pdf.add_page()
         pdf.image(img['name'], 0, 0, img['width'], img['height']) 
-
-    pdf.output("output.pdf")
+    pdf.output(file)
+    log(f'Saved PDF to: {file}')
 
     prepare_paths(download_path=download, image_path=image_path, bin_path=bin_path, cleanup=keep)
 if __name__ == '__main__':
