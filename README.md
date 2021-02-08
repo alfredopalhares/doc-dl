@@ -2,7 +2,7 @@
 
 A simple document downloader that exports the online viewable only documents to a PDF that you can store online.
 
-## Supopoted Platforms
+## Supported Platforms
 
 * ISSU.com
 
