@@ -12,3 +12,7 @@ This tool was not meant to be a piracy aid, it was developed to download old doc
 motorcar and there was no other option.
 I created this app in order to keep the workshop manual for future reference offline.
 I am not responsible for any mis-use of this tool.
+
+## Maintainer
+
+Alfredo Palhares < alfredo at palhares dot me>
