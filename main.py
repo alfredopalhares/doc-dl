@@ -4,6 +4,7 @@ import json
 import os
 import requests
 import shutil
+import hyperlink
 import re
 import click
 
@@ -62,6 +63,22 @@ def log(message:str, level=0):
     if level <= verbosity:
         click.echo(message)
 
+def get_reader_url(url: str) -> str:
+    """ This converst the document URL and converts to url that 
+    provide all the reader data """
+    link= hyperlink.parse(url)
+
+    reader_path = []
+    for p in link.path:
+        if p != 'docs':
+            reader_path.append(p)
+    reader_path.append('reader3_4.json')
+    reader_link = link.replace(host="reader3.isu.pub", path=reader_path, query=[], )
+    
+    log('URL with no GET Query Params: {u}'.format(u=reader_link))
+    return str(reader_link)
+
+
 def get_json(url: str, headers) -> dict:
     pass
 
@@ -80,11 +97,10 @@ def main(download, file, keep, url, verbose):
         log(f'PDF file {file} already exists, remove or specify another name with --file')
         exit(1)
 
-    #url = "https://reader3.isu.pub/ducatiomaha/ducatiomaha_2015_diavel/reader3_4.json"
+    reader_url = get_reader_url(url)
     image_path = os.path.join(download, "jpg/")
     bin_path = os.path.join(download, "bin/")
     payload = ""
-    # 'Host': "reader3.isu.pub",
     headers = {
         'User-Agent':  "Mozilla/5.0 (X11; Linux x86_64; rv:74.0) Gecko/20100101 Firefox/74.0",
         'Accept': "*/*",
@@ -96,7 +112,7 @@ def main(download, file, keep, url, verbose):
         'TE': 'Trailers'
         }
 
-    response = requests.request("GET", url, data=payload, headers=headers)
+    response = requests.request("GET", reader_url, data=payload, headers=headers)
     data = response.json()
     pages = len(data['document']['pages'])
     log(f'Got a document with {pages} pages', 1)
