@@ -4,7 +4,7 @@ A simple document downloader that exports the online viewable only documents to 
 
 ## Supported Platforms
 
-* ISSU.com
+* ISSUU.com
 
 ## Warning
 
